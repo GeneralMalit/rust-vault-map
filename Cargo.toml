@@ -1,0 +1,22 @@
+[package]
+name = "rust-vault-map"
+version = "1.0.0"
+edition = "2021"
+description = "A fast CLI for mapping and diagnosing Obsidian-style Markdown vaults."
+license = "MIT"
+repository = "https://github.com/GeneralMalit/rust-vault-map"
+rust-version = "1.81"
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+dialoguer = "0.11"
+is-terminal = "0.4"
+rand = "0.8"
+thiserror = "1.0"
+walkdir = "2.5"
+
+[dev-dependencies]
+assert_cmd = "2.0"
+predicates = "3.1"
+tempfile = "3.10"
