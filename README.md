@@ -75,6 +75,43 @@ flowchart LR
     E --> G["Markdown report"]
 ```
 
+Component view:
+
+```mermaid
+flowchart TB
+    subgraph CLI["cli.rs - command orchestration"]
+        Args["clap Args<br/>scan &lt;vault-path&gt; --report"]
+        Tty["TTY detection<br/>interactive vs fallback"]
+        Runner["scan_command<br/>shared execution path"]
+    end
+
+    subgraph Core["Rust analysis core"]
+        Scanner["scanner.rs<br/>walkdir traversal<br/>skip hidden/build folders<br/>return note metadata"]
+        Parser["parser.rs<br/>extract Obsidian wiki links<br/>[[Note]], [[Note|Alias]], [[Folder/Note]]"]
+        Graph["graph.rs<br/>sort notes deterministically<br/>resolve edges<br/>track broken and ambiguous links"]
+        Analysis["analysis.rs<br/>orphans<br/>stale notes<br/>hubs<br/>clusters<br/>suggested links"]
+    end
+
+    subgraph Output["User-facing output"]
+        Report["report.rs<br/>stable plain text<br/>Markdown export<br/>capped sections"]
+        Interactive["interactive.rs<br/>arrow-key section browser<br/>drill into findings"]
+    end
+
+    subgraph Quality["1.0 verification"]
+        Tests["tests/<br/>unit + CLI integration"]
+        CI["GitHub Actions<br/>fmt, clippy, tests<br/>80% coverage gate<br/>cargo-deny"]
+    end
+
+    Args --> Tty --> Runner
+    Runner --> Scanner --> Parser --> Graph --> Analysis
+    Analysis --> Report
+    Report --> Interactive
+    Report --> Markdown["report-&lt;folder&gt;-&lt;hash&gt;.md"]
+    Tests -. cover .-> Core
+    Tests -. cover .-> Output
+    CI -. enforces .-> Tests
+```
+
 The analysis is deterministic by design. Reports use stable ordering so output is reviewable, testable, and useful in CI.
 
 ## V1 Scope
