@@ -2,7 +2,7 @@
 
 `rust-vault-map` turns a folder of Markdown notes into a readable knowledge-map diagnosis.
 
-The problem is simple: Obsidian-style vaults grow faster than people can maintain them. Links break, useful notes become isolated, old notes disappear into folders, and clusters of related ideas are hard to see from the file tree alone.
+This project was inspired by my fascination with Tauri and Rust while also maintaining my own knowledge bank in Obsidian. One of the reasons why I chose Obsidian was because of its graph view. It lets me see notes and how everything connects together. But the thing with this is that as my notes grow and grow, the quality of the graph shrinks, and as someone who would like to keep things tidy, i would like to check the current state of the Obsidian vault. This frustrated me because on the graph everything looked fine, but when i inspected the nodes one by one, some of them were actually isolated, and it was harder to graphically track things because you have to see its qualities to understand the issues, and i can see its easy to miss clusters and broken links. So thats why I made this app. 
 
 This CLI scans a vault, builds an explainable graph from wiki links, and shows what needs attention. It is terminal-first, deterministic, and intentionally small enough to be trusted: no AI summaries, no database, no vault mutation, just fast Rust analysis and a clean report.
 
@@ -128,7 +128,7 @@ Included in 1.0:
 
 Not included in 1.0:
 
-- AI summaries or embeddings
+- AI summaries or embeddings (will probably not come anytime soon because using AI for this is just expensive and unnecessary)
 - database storage
 - static HTML graph output
 - Obsidian plugin support
