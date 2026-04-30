@@ -935,3 +935,212 @@ impl Theme {
         Style::default().fg(Color::Red)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::SystemTime;
+
+    use ratatui::backend::TestBackend;
+
+    use super::*;
+    use crate::analysis::{Cluster, HubNote, StaleNote, SuggestedLink, VaultAnalysis};
+    use crate::graph::{AmbiguousLink, BrokenLink, GraphNote, VaultGraph};
+    use crate::parser::WikiLink;
+    use crate::scan::{ScanPhase, ScanProgress};
+
+    #[test]
+    fn renders_overview_and_help_views() {
+        let mut app = DashboardApp::new(sample_outcome());
+        let overview = render_to_text(&app);
+
+        assert!(overview.contains("rust-vault-map"));
+        assert!(overview.contains("Vault health"));
+        assert!(overview.contains("Scan flow"));
+        assert!(overview.contains("Next action: fix broken links first."));
+
+        app.set_active_view(DashboardView::Help);
+        app.focus = DashboardFocus::Content;
+        let help = render_to_text(&app);
+
+        assert!(help.contains("Keyboard"));
+        assert!(help.contains("Enter or o opens selected Markdown file"));
+        assert!(help.contains("--plain forces deterministic text output."));
+    }
+
+    #[test]
+    fn renders_all_finding_detail_views() {
+        let cases = [
+            (
+                DashboardView::BrokenLinks,
+                "Broken link",
+                "Source: Index.md",
+            ),
+            (
+                DashboardView::AmbiguousLinks,
+                "Ambiguous link",
+                "Candidates: Areas/Topic.md",
+            ),
+            (DashboardView::Orphans, "Orphan note", "Path: Orphan.md"),
+            (DashboardView::Stale, "Stale note", "Path: Stale.md"),
+            (DashboardView::Hubs, "Hub note", "Inbound: 4"),
+            (DashboardView::Clusters, "Cluster", "Samples: Cluster/A.md"),
+            (
+                DashboardView::Suggestions,
+                "Suggested link",
+                "Mention: Suggestion",
+            ),
+        ];
+
+        for (view, heading, detail) in cases {
+            let mut app = DashboardApp::new(sample_outcome());
+            app.set_active_view(view);
+            app.focus = DashboardFocus::Content;
+
+            let rendered = render_to_text(&app);
+
+            assert!(rendered.contains(view.label()));
+            assert!(rendered.contains(heading));
+            assert!(rendered.contains(detail));
+        }
+    }
+
+    #[test]
+    fn renders_empty_finding_detail() {
+        let mut outcome = sample_outcome();
+        outcome.graph.broken_links.clear();
+        let mut app = DashboardApp::new(outcome);
+        app.set_active_view(DashboardView::BrokenLinks);
+        app.focus = DashboardFocus::Content;
+
+        let rendered = render_to_text(&app);
+
+        assert!(rendered.contains("No findings in this section."));
+        assert!(rendered.contains("Nothing selected"));
+    }
+
+    #[test]
+    fn renders_scrolled_finding_list_with_selected_row_visible() {
+        let mut outcome = sample_outcome();
+        outcome.analysis.orphan_notes = (0..60)
+            .map(|index| format!("Orphan-{index:02}.md"))
+            .collect();
+        let mut app = DashboardApp::new(outcome);
+        app.set_active_view(DashboardView::Orphans);
+        app.focus = DashboardFocus::Content;
+        for _ in 0..45 {
+            app.select_next();
+        }
+
+        let rendered = render_to_text(&app);
+
+        assert!(rendered.contains("Orphan-45.md"));
+        assert!(!rendered.contains("Orphan-00.md"));
+    }
+
+    #[test]
+    fn helpers_cover_editor_parsing_and_ranges() {
+        let parsed = parse_editor_command("code --wait --reuse-window");
+
+        assert_eq!(parsed.program, "code");
+        assert_eq!(parsed.args, ["--wait", "--reuse-window"]);
+        let expected_os = if cfg!(windows) {
+            EditorOs::Windows
+        } else {
+            EditorOs::Unix
+        };
+        assert_eq!(current_os(), expected_os);
+        assert_eq!(visible_item_range(0, 0, 4), 0..0);
+        assert_eq!(visible_item_range(9, 10, 4), 6..10);
+    }
+
+    fn render_to_text(app: &DashboardApp) -> String {
+        let backend = TestBackend::new(120, 32);
+        let mut terminal = Terminal::new(backend).expect("terminal");
+        terminal
+            .draw(|frame| render_dashboard(frame, app))
+            .expect("draw");
+
+        terminal
+            .backend()
+            .buffer()
+            .content
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<Vec<_>>()
+            .join("")
+    }
+
+    fn sample_outcome() -> ScanOutcome {
+        ScanOutcome {
+            vault_path: "D:/Notes/Home".to_string(),
+            note_count: 8,
+            folder_count: 2,
+            wiki_link_count: 5,
+            skipped_file_count: 0,
+            stale_threshold_days: 90,
+            graph: VaultGraph {
+                notes: vec![note("Index.md"), note("Rust.md")],
+                edges: Vec::new(),
+                broken_links: vec![BrokenLink {
+                    source_path: "Index.md".to_string(),
+                    target: "Missing".to_string(),
+                }],
+                ambiguous_links: vec![AmbiguousLink {
+                    source_path: "Index.md".to_string(),
+                    target: "Topic".to_string(),
+                    candidates: vec![
+                        "Areas/Topic.md".to_string(),
+                        "Projects/Topic.md".to_string(),
+                    ],
+                }],
+            },
+            analysis: VaultAnalysis {
+                orphan_notes: vec!["Orphan.md".to_string()],
+                stale_notes: vec![StaleNote {
+                    path: "Stale.md".to_string(),
+                    modified: SystemTime::UNIX_EPOCH,
+                }],
+                oldest_note_age_days: Some(100),
+                hub_notes: vec![HubNote {
+                    path: "Hub.md".to_string(),
+                    inbound: 4,
+                    outbound: 2,
+                }],
+                clusters: vec![Cluster {
+                    notes: vec!["Cluster/A.md".to_string(), "Cluster/B.md".to_string()],
+                }],
+                suggested_links: vec![SuggestedLink {
+                    source_path: "Index.md".to_string(),
+                    target_path: "Suggestion.md".to_string(),
+                    mention: "Suggestion".to_string(),
+                }],
+            },
+            phases: vec![
+                ScanProgress {
+                    phase: ScanPhase::DiscoverNotes,
+                    state: PhaseState::Complete,
+                    detail: "8 notes".to_string(),
+                },
+                ScanProgress {
+                    phase: ScanPhase::BuildGraph,
+                    state: PhaseState::Attention,
+                    detail: "1 broken".to_string(),
+                },
+            ],
+        }
+    }
+
+    fn note(path: &str) -> GraphNote {
+        GraphNote {
+            path: path.to_string(),
+            title: path.trim_end_matches(".md").to_string(),
+            body: String::new(),
+            links: vec![WikiLink {
+                target: "Rust".to_string(),
+                alias: None,
+                raw: "[[Rust]]".to_string(),
+            }],
+            modified: Some(SystemTime::UNIX_EPOCH),
+        }
+    }
+}
