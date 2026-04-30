@@ -1,6 +1,6 @@
 {
   "name": "rust-vault-map-release",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Release automation for rust-vault-map.",
   "repository": {
