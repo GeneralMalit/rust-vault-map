@@ -10,9 +10,11 @@ rust-version = "1.81"
 [dependencies]
 anyhow = "1.0"
 clap = { version = "4.5", features = ["derive"] }
+crossterm = "0.28"
 dialoguer = "0.11"
 is-terminal = "0.4"
 rand = "0.8"
+ratatui = "0.28"
 thiserror = "1.0"
 walkdir = "2.5"
 

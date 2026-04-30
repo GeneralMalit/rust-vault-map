@@ -1,7 +1,11 @@
 [advisories]
 version = 2
 yanked = "deny"
-ignore = []
+ignore = [
+    # ratatui 0.28 pulls paste transitively for macros. The advisory marks
+    # paste as unmaintained, not vulnerable; accepted for the TUI dependency.
+    "RUSTSEC-2024-0436",
+]
 
 [licenses]
 version = 2
@@ -10,6 +14,7 @@ allow = [
     "Apache-2.0",
     "MIT",
     "Unicode-3.0",
+    "Zlib",
 ]
 
 [bans]

@@ -8,13 +8,19 @@ This CLI scans a vault, builds an explainable graph from wiki links, and shows w
 
 ## Demo
 
-Interactive mode is the default:
+In an interactive terminal, scan opens the full-screen dashboard:
 
 ```powershell
 rust-vault-map scan D:\path\to\vault
 ```
 
-Use arrow keys to browse sections such as broken links, orphan notes, stale notes, hubs, clusters, and suggested links.
+Use `Tab` or the arrow keys to browse sections such as broken links, orphan notes, stale notes, hubs, clusters, and suggested links. Press `e` or `r` from the dashboard to export a Markdown report.
+
+For deterministic text output in a terminal, use:
+
+```powershell
+rust-vault-map scan D:\path\to\vault --plain
+```
 
 For a quick artifact, write the findings to Markdown:
 
@@ -71,7 +77,7 @@ flowchart LR
     B --> C["Markdown parser"]
     C --> D["Link graph"]
     D --> E["Analysis"]
-    E --> F["Interactive CLI"]
+    E --> F["Full-screen dashboard"]
     E --> G["Markdown report"]
 ```
 
@@ -81,7 +87,7 @@ Component view:
 flowchart TB
     subgraph CLI["cli.rs - command orchestration"]
         Args["clap Args<br/>scan &lt;vault-path&gt; --report"]
-        Tty["TTY detection<br/>interactive vs fallback"]
+        Tty["TTY detection<br/>dashboard vs plain output"]
         Runner["scan_command<br/>shared execution path"]
     end
 
@@ -94,7 +100,8 @@ flowchart TB
 
     subgraph Output["User-facing output"]
         Report["report.rs<br/>stable plain text<br/>Markdown export<br/>capped sections"]
-        Interactive["interactive.rs<br/>arrow-key section browser<br/>drill into findings"]
+        Scan["scan.rs<br/>typed scan phases<br/>shared scan outcome"]
+        Dashboard["tui.rs<br/>Ratatui dashboard<br/>metadata drilldowns"]
     end
 
     subgraph Quality["1.0 verification"]
@@ -104,15 +111,20 @@ flowchart TB
 
     Args --> Tty --> Runner
     Runner --> Scanner --> Parser --> Graph --> Analysis
-    Analysis --> Report
-    Report --> Interactive
+    Analysis --> Scan
+    Scan --> Report
+    Scan --> Dashboard
     Report --> Markdown["report-&lt;folder&gt;-&lt;hash&gt;.md"]
     Tests -. cover .-> Core
     Tests -. cover .-> Output
     CI -. enforces .-> Tests
 ```
 
-The analysis is deterministic by design. Reports use stable ordering so output is reviewable, testable, and useful in CI.
+The analysis is deterministic by design. Plain reports use stable ordering so output is reviewable, testable, and useful in CI; the dashboard is reserved for real TTY sessions.
+
+## Post-v1 Dashboard
+
+The post-v1 terminal dashboard adds a richer interactive surface without changing the read-only analyzer contract. It shows scan phase status, vault health metrics, prioritized next actions, and metadata-only drilldowns for each finding type. Non-interactive use remains script-friendly through plain output and Markdown export.
 
 ## V1 Scope
 
@@ -190,4 +202,4 @@ The project starts at `1.0.0`. Releases are automated from `main` with semantic-
 
 ## Roadmap
 
-Possible next steps: JSON output, configurable stale thresholds, richer Markdown parsing, graph export, benchmark reporting, and prebuilt release binaries.
+Possible next steps: JSON output, configurable stale thresholds, richer Markdown parsing, graph export, light/dark theme variants, benchmark reporting, and prebuilt release binaries.
