@@ -4,4 +4,6 @@ pub mod graph;
 pub mod interactive;
 pub mod parser;
 pub mod report;
+pub mod scan;
 pub mod scanner;
+pub mod tui;

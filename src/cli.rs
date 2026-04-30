@@ -1,19 +1,14 @@
 use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
-use std::time::SystemTime;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use is_terminal::IsTerminal;
 use rand::Rng;
 
-use crate::analysis::{analyze_graph, STALE_DAYS};
-use crate::graph::{build_graph, GraphNote};
-use crate::interactive::run_interactive_report;
-use crate::parser::extract_wiki_links;
 use crate::report::{render_markdown_report, render_report, render_report_colored, ReportInput};
-use crate::scanner::scan_vault;
+use crate::scan::{scan_vault_quiet, ScanOutcome};
+use crate::tui::run_dashboard;
 
 #[derive(Debug, Parser)]
 #[command(name = "rust-vault-map")]
@@ -31,6 +26,8 @@ enum Command {
         interactive: bool,
         #[arg(long)]
         report: bool,
+        #[arg(long)]
+        plain: bool,
     },
 }
 
@@ -42,25 +39,21 @@ pub fn run() -> Result<()> {
             vault_path,
             interactive,
             report,
+            plain,
         } => {
             if report {
                 let report_path = write_markdown_report(&vault_path)?;
                 println!("Report written to {}", report_path.display());
-            } else if interactive || (io::stdin().is_terminal() && io::stdout().is_terminal()) {
+            } else if plain || !std::io::stdin().is_terminal() || !std::io::stdout().is_terminal() {
                 let report = scan_command(&vault_path)?;
-                if io::stdin().is_terminal() && io::stdout().is_terminal() {
-                    run_interactive_report(&report)?;
-                } else {
-                    eprintln!("Interactive terminal unavailable; showing report instead.");
-                    println!("{report}");
-                }
-            } else if io::stdout().is_terminal() {
-                let report = scan_command_colored(&vault_path)?;
-                eprintln!("Interactive terminal unavailable; showing report instead.");
                 println!("{report}");
+            } else if interactive || std::io::stdout().is_terminal() {
+                let outcome = scan_vault_quiet(&vault_path)?;
+                run_dashboard(outcome, |outcome| {
+                    export_markdown_report(outcome).map(|path| path.display().to_string())
+                })?;
             } else {
                 let report = scan_command(&vault_path)?;
-                eprintln!("Interactive terminal unavailable; showing report instead.");
                 println!("{report}");
             }
             Ok(())
@@ -81,8 +74,13 @@ pub fn scan_command_markdown(vault_path: &Path) -> Result<String> {
 }
 
 pub fn write_markdown_report(vault_path: &Path) -> Result<PathBuf> {
-    let markdown = scan_command_markdown(vault_path)?;
-    let file_name = report_file_name(vault_path);
+    let outcome = scan_vault_quiet(vault_path)?;
+    export_markdown_report(&outcome)
+}
+
+pub fn export_markdown_report(outcome: &ScanOutcome) -> Result<PathBuf> {
+    let markdown = render_markdown_report(&outcome.report_input());
+    let file_name = report_file_name(Path::new(&outcome.vault_path));
     let report_path = std::env::current_dir()
         .context("failed to resolve current directory")?
         .join(file_name);
@@ -95,59 +93,8 @@ fn scan_command_with_renderer(
     vault_path: &Path,
     renderer: fn(&ReportInput<'_>) -> String,
 ) -> Result<String> {
-    let scan = scan_vault(vault_path)?;
-    let mut graph_notes = Vec::new();
-    let mut skipped_file_count = scan.skipped_files.len();
-    let mut wiki_link_count = 0;
-
-    for note in &scan.notes {
-        match fs::read_to_string(&note.path) {
-            Ok(markdown) => {
-                let links = extract_wiki_links(&markdown);
-                wiki_link_count += links.len();
-                graph_notes.push(GraphNote {
-                    path: note.relative_path.clone(),
-                    title: title_for_note(&note.relative_path, &markdown),
-                    body: markdown,
-                    links,
-                    modified: note.modified,
-                });
-            }
-            Err(_) => skipped_file_count += 1,
-        }
-    }
-
-    let graph = build_graph(graph_notes);
-    let analysis = analyze_graph(&graph, SystemTime::now());
-
-    let input = ReportInput {
-        vault_path: vault_path.display().to_string(),
-        note_count: graph.notes.len(),
-        folder_count: scan.folder_count,
-        wiki_link_count,
-        skipped_file_count,
-        stale_threshold_days: STALE_DAYS,
-        graph: &graph,
-        analysis: &analysis,
-    };
-
-    Ok(renderer(&input))
-}
-
-fn title_for_note(relative_path: &str, markdown: &str) -> String {
-    markdown
-        .lines()
-        .find_map(|line| line.strip_prefix("# ").map(str::trim))
-        .filter(|title| !title.is_empty())
-        .map(str::to_string)
-        .unwrap_or_else(|| {
-            relative_path
-                .trim_end_matches(".md")
-                .rsplit('/')
-                .next()
-                .unwrap_or(relative_path)
-                .to_string()
-        })
+    let outcome = scan_vault_quiet(vault_path)?;
+    Ok(renderer(&outcome.report_input()))
 }
 
 fn report_file_name(vault_path: &Path) -> String {

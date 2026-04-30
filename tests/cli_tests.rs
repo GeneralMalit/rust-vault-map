@@ -14,9 +14,7 @@ fn scan_command_reports_fixture_vault() {
 
     cmd.assert()
         .success()
-        .stderr(predicate::str::contains(
-            "Interactive terminal unavailable; showing report instead.",
-        ))
+        .stderr(predicate::str::is_empty())
         .stdout(predicate::str::starts_with("rust-vault-map scan report"))
         .stdout(predicate::str::contains("rust-vault-map scan report"))
         .stdout(predicate::str::contains("Markdown notes: 9"))
@@ -24,6 +22,21 @@ fn scan_command_reports_fixture_vault() {
         .stdout(predicate::str::contains("Obsidian links: 13"))
         .stdout(predicate::str::contains("Index.md -> Missing Note"))
         .stdout(predicate::str::contains("Orphan.md"));
+}
+
+#[test]
+fn scan_plain_flag_forces_plain_report_output() {
+    let fixture = fixture_vault();
+    let root = fixture.path();
+
+    let mut cmd = Command::cargo_bin("rust-vault-map").expect("binary");
+    cmd.arg("scan").arg(root).arg("--plain");
+
+    cmd.assert()
+        .success()
+        .stderr(predicate::str::is_empty())
+        .stdout(predicate::str::starts_with("rust-vault-map scan report"))
+        .stdout(predicate::str::contains("Markdown notes: 9"));
 }
 
 #[test]
