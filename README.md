@@ -1,10 +1,10 @@
 # rust-vault-map
 
-`rust-vault-map` turns a folder of Markdown notes into a readable knowledge-map diagnosis.
+`rust-vault-map` turns a folder of Markdown notes into an interactive knowledge-map diagnosis.
 
 The problem is simple: Obsidian-style vaults grow faster than people can maintain them. Links break, useful notes become isolated, old notes disappear into folders, and clusters of related ideas are hard to see from the file tree alone.
 
-This CLI scans a vault, builds an explainable graph from wiki links, and shows what needs attention. It is terminal-first, deterministic, and intentionally small enough to be trusted: no AI summaries, no database, no vault mutation, just fast Rust analysis and a clean report.
+This CLI scans a vault, builds an explainable graph from wiki links, and shows what needs attention. It is terminal-first and deterministic: no AI summaries, no database, and no automatic rewrites. The full-screen dashboard helps you inspect issues and open the relevant Markdown files in your editor when you choose to fix them.
 
 ## Demo
 
@@ -14,7 +14,7 @@ In an interactive terminal, scan opens the full-screen dashboard:
 rust-vault-map scan D:\path\to\vault
 ```
 
-Use `Tab` or the arrow keys to browse sections such as broken links, orphan notes, stale notes, hubs, clusters, and suggested links. Press `e` or `r` from the dashboard to export a Markdown report.
+Use `Up` and `Down` to move through sections, then `Right` or `Enter` to inspect a section. Inside a findings list, use `Up` and `Down` to move through items, `Left` to return to sections, and `Enter` or `o` to open the selected Markdown file in your editor. Press `e` or `r` from the dashboard to export a Markdown report.
 
 For deterministic text output in a terminal, use:
 
@@ -69,6 +69,15 @@ Clusters: 3 total
 - basic graph clusters
 - suggested links from unlinked title mentions
 
+## What You Can Do In The Dashboard
+
+- browse vault health metrics and prioritized next actions
+- inspect broken links, ambiguous links, orphan notes, stale notes, hubs, clusters, and suggested links
+- keep long findings lists scrolled to the selected row
+- open the selected Markdown note through `$VISUAL`, `$EDITOR`, or the OS fallback editor
+- export a deterministic Markdown report
+- fall back to stable plain text output for scripts and CI
+
 ## How It Works
 
 ```mermaid
@@ -104,7 +113,7 @@ flowchart TB
         Dashboard["tui.rs<br/>Ratatui dashboard<br/>metadata drilldowns"]
     end
 
-    subgraph Quality["1.0 verification"]
+    subgraph Quality["2.0 verification"]
         Tests["tests/<br/>unit + CLI integration"]
         CI["GitHub Actions<br/>fmt, clippy, tests<br/>80% coverage gate<br/>cargo-deny"]
     end
@@ -122,35 +131,34 @@ flowchart TB
 
 The analysis is deterministic by design. Plain reports use stable ordering so output is reviewable, testable, and useful in CI; the dashboard is reserved for real TTY sessions.
 
-## Post-v1 Dashboard
+## Product Scope
 
-The post-v1 terminal dashboard adds a richer interactive surface without changing the read-only analyzer contract. It shows scan phase status, vault health metrics, prioritized next actions, and metadata-only drilldowns for each finding type. Non-interactive use remains script-friendly through plain output and Markdown export.
+Included:
 
-## V1 Scope
-
-Included in 1.0:
-
-- recursive `.md` discovery
+- recursive Markdown note discovery
 - hidden/build folder skipping
 - `[[Note]]`, `[[Note|Alias]]`, and `[[Folder/Note]]` links
-- interactive terminal browsing
+- full-screen terminal dashboard for TTY sessions
+- deterministic plain text output for non-TTY sessions and `--plain`
 - Markdown report export with unique filenames
+- external editor launch for selected Markdown notes
 - unit and integration coverage for scanner, parser, graph, analysis, reporting, and CLI behavior
 - GitHub Actions for formatting, linting, tests, coverage, dependency policy, and releases
 
-Not included in 1.0:
+Not included:
 
 - AI summaries or embeddings
 - database storage
 - static HTML graph output
 - Obsidian plugin support
 - config files
-- automatic edits to the user's vault
+- automatic edits to the user's vault without opening an editor
 
 ## Tech Stack
 
 - Rust stable
 - `clap` for command parsing
+- `ratatui` and `crossterm` for the dashboard
 - `dialoguer` for interactive terminal prompts
 - `anyhow` and `thiserror` for errors
 - `assert_cmd`, `predicates`, and `tempfile` for tests
@@ -161,6 +169,7 @@ Not included in 1.0:
 ```powershell
 cargo build
 cargo run -- scan D:\path\to\vault
+cargo run -- scan D:\path\to\vault --plain
 cargo run -- scan D:\path\to\vault --report
 ```
 
@@ -190,15 +199,17 @@ rust-vault-map/
     parser.rs
     graph.rs
     analysis.rs
-    interactive.rs
+    scan.rs
+    tui.rs
     report.rs
+    interactive.rs
   tests/
   .github/workflows/
 ```
 
 ## Versioning
 
-The project starts at `1.0.0`. Releases are automated from `main` with semantic-release and conventional commits. Each release updates the Cargo/package version, creates a Git tag, and publishes GitHub release notes.
+The current major version is `2.0.0`, reflecting the move from a report-first CLI to a full-screen terminal dashboard. Releases are automated from `main` with semantic-release and conventional commits. Each release updates the Cargo/package version, creates a Git tag, and publishes GitHub release notes.
 
 ## Roadmap
 
